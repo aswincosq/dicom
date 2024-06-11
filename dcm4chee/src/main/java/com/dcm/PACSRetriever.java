@@ -64,17 +64,32 @@ public class PACSRetriever {
             association.cfind("1.2.840.10008.5.1.4.1.2.2.1", 1, queryKeys, null, new DimseRSPHandler(association.nextMessageID()) {
                 @Override
                 public void onDimseRSP(Association as, Attributes cmd, Attributes data) {
-                    if (data != null) {
-                        String iuid = data.getString(Tag.StudyInstanceUID);
-                        System.out.println("Study Instance UID: " + iuid);
+                    int status = cmd.getInt(Tag.Status, -1);
+                    if (status == 0) {
+                        System.out.println("cfind completed successfully.");
+                        if (data != null) {
+                            String iuid = data.getString(Tag.StudyInstanceUID);
+                            System.out.println("Study Instance UID: " + iuid);
 
-                        // Retrieve the DICOM files
-                        try {
-                            // Corrected cmove call
-                            association.cmove(calledAETitle, 1, queryKeys, null, "1.2.840.10008.1.2.1", new DimseRSPHandler(association.nextMessageID()));
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                            // Retrieve the DICOM files
+                            try {
+                                association.cmove(calledAETitle, 1, queryKeys, null, "1.2.840.10008.1.2.1", new DimseRSPHandler(association.nextMessageID()) {
+                                    @Override
+                                    public void onDimseRSP(Association as, Attributes cmd, Attributes data) {
+                                        int moveStatus = cmd.getInt(Tag.Status, -1);
+                                        if (moveStatus == 0) {
+                                            System.out.println("cmove completed successfully.");
+                                        } else {
+                                            System.err.println("cmove failed with status: " + Integer.toHexString(moveStatus));
+                                        }
+                                    }
+                                });
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
                         }
+                    } else {
+                        System.err.println("cfind failed with status: " + Integer.toHexString(status));
                     }
                 }
             });
